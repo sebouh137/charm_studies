@@ -1,0 +1,24 @@
+io-services:
+  reader:
+    class: org.jlab.jnp.grapes.io.HipoFrameReader
+    name: HipoFrameReader
+  writer:
+    class: org.jlab.jnp.grapes.io.HipoFrameWriter
+    name: HipoFrameWriter
+services:
+  - class: org.jlab.jnp.grapes.services.GenericWagon
+    name: D0Bar
+  - class: org.jlab.jnp.grapes.services.GenericWagon
+    name: LambdaCplus
+configuration:
+  services:
+    D0Bar:
+      id: 1
+      filter: 11:321:-211:X+:X-:Xn
+      electron: Q2<0.6
+    LambdaCplus:
+      id: 2
+      filter: 11:2212:-321:211:X+:X-:Xn
+      electron: Q2<0.6
+mime-types:
+  - binary/data-hipo-frame
