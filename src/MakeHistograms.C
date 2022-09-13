@@ -75,6 +75,7 @@ double cut_HTCCmin = 2;
 double sf1[7], sf2[7], sf3[7], sf4[7];
 double sfs1[7], sfs2[7], sfs3[7], sfs4[7];
 
+
 void toCM(TLorentzVector cm, TLorentzVector p,TLorentzVector& result){
   result = p;
 
@@ -93,6 +94,12 @@ double angle(double phi){
     phi+=2*pi;
   return phi;
 }
+
+
+bool acceptHadron(auto h){
+  return true;
+}
+
 
 
 void MakeHistograms(){
@@ -610,7 +617,7 @@ void MakeHistograms(){
 	  
 
 	  double dtime = electrons[i]->getTime()-h->getTime();
-	  bool useDCcuts=0;
+	  bool useDCcuts=1;
 	  //if(debug) cout << "dc"<<endl;
 	  if(useDCcuts && !dcOK(h,torus))
 	    continue;
