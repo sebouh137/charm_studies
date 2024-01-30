@@ -22,6 +22,7 @@
 
 using namespace clas12;
 
+auto db=TDatabasePDG::Instance();
 
 const int INBEND=1, OUTBEND=0;
 
@@ -43,7 +44,7 @@ double c30 = cos(TMath::Pi()/6);
 bool pcalOK(clas12::region_part_ptr p){
   
   return p->cal(PCAL)->getLv()>9.0 && p->cal(PCAL)->getLw()>9.0;
-
+  
 }
 
 //list of cuts
@@ -78,12 +79,12 @@ double sfs1[7], sfs2[7], sfs3[7], sfs4[7];
 
 void toCM(TLorentzVector cm, TLorentzVector p,TLorentzVector& result){
   result = p;
-
+  
   result.RotateZ(TMath::Pi()-cm.Phi());
   result.RotateY(cm.Theta());
   
   result.Boost(0,0,-cm.Beta());
-
+  
 }
 
 double angle(double phi){
@@ -95,9 +96,48 @@ double angle(double phi){
   return phi;
 }
 
+int torus;
 
-bool acceptHadron(auto h){
-  return true;
+
+bool acceptHadron(clas12::region_particle * h, clas12::region_particle * electron){
+  int h_pid = h->getPid();
+  
+  TLorentzVector had;
+  if(h_pid != 211 && h_pid != -211 && h_pid != 2212 && h_pid != -2212 && h_pid != 321 && h_pid != -321)
+    return false;
+  
+  
+  double dtime = electron->getTime()-h->getTime();
+
+  if(!dcOK(h,torus))
+    return false;
+  
+  //if(debug) cout << "pip" << endl;
+  double mass = db->GetParticle(h_pid)->Mass();
+  SetLorentzVector(had,h, mass);
+  double h_p = had.P();
+  double c = 29.9792458; //cm/ns
+  auto dtime_corr =dtime-electron->getPath()/c+h->getPath()/(had.Beta()*c);
+  if(abs(dtime_corr) > cut_dtime_corr)
+    return false;
+  
+  
+  //h_pid = h->par()->getPid();
+  auto h_chi2pid = h->par()->getChi2Pid();
+  
+  //scaling constant for pid cut
+  double C = .88*(h_pid == 211)+.93*(h_pid == -211)+ 1.30*(abs(h_pid)==2212)+1.0*(abs(h_pid) != 211 && abs(h_pid)!=2212);
+  if(abs(h_chi2pid) >3*C)
+    return false;
+  
+  //tighter cut for pions
+  if(abs(h_pid) == 211 && h_p>2.44 && h_chi2pid >(0.00869+14.98587*exp(-h_p/1.18236)+1.81751*exp(-h_p/4.86394))*C)
+    return false;
+  
+  auto dvz = electron->par()->getVz()-h->par()->getVz();
+  
+  if(dvz < cut_dvzmin || dvz > cut_dvzmax)
+    return false;
 }
 
 
@@ -109,7 +149,7 @@ void MakeHistograms(){
   
   /////////////////////////////////////
   //ignore this just getting file name!
-  int torus;
+  
   TString outputFile;
   TChain input("hipo");
   int skipEvents=0;
@@ -119,17 +159,32 @@ void MakeHistograms(){
   bool DConly=0;
   bool isMC = 0;
   TString qadbPath="";
-
+  
   TLorentzVector had;
+
+  //D0bar recon
   TH1* invmass_Kp_pim = new TH1D("Kp_pim_invmass", "pair mass K+pi-;m_{K^{+}#pi^{-}} [GeV];events",500, 0, 10);
+  TH1* invmass_Kp_pim_zoom = new TH1D("Kp_pim_invmass_zoom", "pair mass K+pi-;m_{K^{+}#pi^{-}} [GeV];events",500, 1.5, 2.0);
   TH1* missingmass_Kp_pim = new TH1D("Kp_pim_missmass", "missing mass K+pi-;m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events",500, -10, 10);
   TH2* Kp_pim_2d = new TH2D("Kp_pim_2d", "invariant vs missing mass K+pi-;m_{K^{+}#pi^{-}} [GeV];m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events",500,0, 10, 500, -10, 10);
   TH2* Kp_pim_2d_zoom=new TH2D("Kp_pim_2d_zoom", "invariant vs missing mass K+pi-;m_{K^{+}#pi^{-}} [GeV];m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events", 500, 1.5, 2, 500, 2.0, 2.5);
   
+  //Lambda c recon
   TH1* invmass_Km_pip_p = new TH1D("Km_pip_p_invmass", "pair mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];events",500, 0, 10);
   TH1* missingmass_Km_pip_p = new TH1D("Km_pip_p_missmass", "missing mass K-pi+p;m_{X}(ep,e'K^{-}#pi^{+}pX) [GeV];events",500, -10, 10);
   TH2* Km_pip_p_2d = new TH2D("Km_pip_p_2d", "invariant vs missing mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];m_{X}(ep,e'K^{+}#pi^{-}p'X) [GeV];events",500,0, 10, 500, -10, 10);
   TH2* Km_pip_p_2d_zoom = new TH2D("Km_pip_p_2d_zoom", "invariant vs missing mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];m_{X}(ep,e'K^{+}#pi^{-}p'X) [GeV];events",500,2.0, 2.5, 500, 1.5, 2);
+  
+
+  //Lambda recon
+  TH1* invmass_pim_p = new TH1D("pim_p_invmass", "pair mass pi-p;m_{#pi{-}p} [GeV];events",500, 0, 5);
+  TH1* invmass_pim_p_zoom = new TH1D("pim_p_invmass_zoom", "pair mass pi-p;m_{#pi{-}p} [GeV];events",500, 1.05, 1.30);
+
+  //D0 recon (not D0 bar)
+  TH1* invmass_Km_pip = new TH1D("Km_pip_invmass", "pair mass K-pi+;m_{K^{-}#pi^{+}} [GeV];events",500, 0, 10);
+  TH1* missingmass_Km_pip = new TH1D("Km_pip_missmass", "missing mass K-pi+;m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events",500, -10, 10);
+  TH2* Km_pip_2d = new TH2D("Km_pip_2d", "invariant vs missing mass K-pi+;m_{K^{-}#pi^{+}} [GeV];m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events",500,0, 10, 500, -10, 10);
+  TH2* Km_pip_2d_zoom=new TH2D("Km_pip_2d_zoom", "invariant vs missing mass K-pi+;m_{K^{-}#pi^{+}} [GeV];m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events", 500, 1.5, 2, 500, 2.0, 2.5);
 
   for(Int_t ii=1;ii<gApplication->Argc();ii++){
     TString opt=gApplication->Argv(ii);
@@ -177,26 +232,26 @@ void MakeHistograms(){
     
   }
   
-    
+  
   clas12::clas12databases *dbc12;
-
+  
   clas12::clas12databases::SetCCDBRemoteConnection();
   if(!isMC){
     clas12::clas12databases::SetRCDBRemoteConnection();
     /*if(!qadbPath.EqualTo("")){
-      cout << "setting qadb connection" <<endl;
-      clas12::clas12databases::SetQADBConnection((const std::string)qadbPath);
-      cout << "successfully connected to qadb" <<endl;
-      }*/
+     cout << "setting qadb connection" <<endl;
+     clas12::clas12databases::SetQADBConnection((const std::string)qadbPath);
+     cout << "successfully connected to qadb" <<endl;
+     }*/
   }
-
+  
   dbc12 = new clas12::clas12databases();
-
-
+  
+  
   auto files=input.GetListOfFiles();
   
   //some particles
-  auto db=TDatabasePDG::Instance();
+  //static auto db=TDatabasePDG::Instance();
   
   
   //double recoilMass = 0;
@@ -235,7 +290,7 @@ void MakeHistograms(){
     }
     ccdb->close();
     
-
+    
     double E;
     if(!isMC){
       
@@ -279,39 +334,7 @@ void MakeHistograms(){
     
     TLorentzVector beam(0,0,E,E);
     
-    //  clas12reader c12(files->At(i)->GetTitle(),{0});//add tags {tag1,tag2,tag3,...}
-    
-    //Add some event Pid based selections
-    //////////c12.AddAtLeastPid(211,1); //at least 1 pi+
-    //c12.addExactPid(11,1);    //exactly 1 electron
-    //c12.addExactPid(211,1);    //exactly 1 pi+
-    //c12.addExactPid(-211,1);    //exactly 1 pi-
-    //c12.addExactPid(2212,1);    //exactly 1 proton
-    //c12.addExactPid(22,2);    //exactly 2 gamma
-    //////c12.addZeroOfRestPid();  //nothing else
-    //////c12.useFTBased(); //and use the Pids from RECFT
-    
-    //can also access the integrated current at this point
-    //c12.scalerReader();//must call this first
-    //c12.getRunBeamCharge();
-    
-    //int max = 100000;
-    
-    
-    // for data, this step can be done.
-    // with MC, there are events with
-    // electrons that fail recon,
-    // so these must not be excluded
-    if(!isMC)
-      c12.addAtLeastPid(11,1);
-    
-    // for event mixing:  the cm frame fourvector two events ago
-    TLorentzVector cm_mix = {0,0,0,0};
-    // for event mixing:  the cm frame fourvector one events ago
-    TLorentzVector cm_mix_tmp = {0,0,0,0};
-    // for event mixing: the trigger hadron in the previous entry.
-    TLorentzVector had_mix = {0,0,0,0};
-    
+
     while(c12.next()==true){
       if(isMC && E==0){
         auto dict = c12.getDictionary();
@@ -329,13 +352,13 @@ void MakeHistograms(){
           //helicity = bank.getFloat(schema.getEntryOrder("helicity"),0);
         }
       } else {
-	auto dict = c12.getDictionary();
-	if(dict.hasSchema("RUN::config")){
+        auto dict = c12.getDictionary();
+        if(dict.hasSchema("RUN::config")){
           auto schema = dict.getSchema("RUN::config");
-	  hipo::bank bank(schema);
+          hipo::bank bank(schema);
           c12.getStructure(&bank);
           //evt_num = bank.getInt(schema.getEntryOrder("event"),0);
-	  //run_num = bank.getInt(schema.getEntryOrder("run"),0);
+          //run_num = bank.getInt(schema.getEntryOrder("run"),0);
         }
         
       }
@@ -352,138 +375,58 @@ void MakeHistograms(){
         continue;
       }
       count ++;
-      //can get an estimate of the beam current to this event
-      //c12.getCurrApproxCharge();//if called c12.scalerReader();
       
-      //c12.event()->getStartTime();
-      
-      
-      //Loop over all particles to see how to access detector info.
-      /*
-       for(auto& p : c12.getDetParticles()){
-       //  get predefined selected information
-       p->getTime();
-       p->getDetEnergy();
-       p->getDeltaEnergy();
-       
-       //check trigger bits
-       //	 if(c12.checkTriggerBit(25)) cout<<"MesonExTrigger"<<endl;
-       //	 else cout<<"NOT"<<endl;
-       
-       // get any detector information (if exists for this particle)
-       // there should be a get function for any entry in the bank
-       switch(p->getRegion()) {
-       case FD :
-       p->cal(PCAL)->getEnergy();
-       p->cal(ECIN)->getEnergy();
-       p->cal(ECOUT)->getEnergy();
-       p->sci(FTOF1A)->getEnergy();
-       p->sci(FTOF1B)->getEnergy();
-       p->sci(FTOF2)->getEnergy();
-       p->trk(DC)->getSector();
-       p->che(HTCC)->getNphe();
-       p->che(LTCC)->getNphe();
-       //trajectories
-       p->traj(LTCC)->getX();
-       // p->traj(DC,DC1)->getCx();; //First layer of DC, hipo4
-       break;
-       case FT :
-       p->ft(FTCAL)->getEnergy();
-       p->ft(FTHODO)->getEnergy();
-       break;
-       case CD:
-       p->sci(CTOF)->getEnergy();
-       p->sci(CND)->getEnergy();
-       break;
-       }
-       //   covariance matrix (comment in to see!)
-       // p->covmat()->print();
-       p->cmat();
-       }*/
       
       // get particles by type
       
       auto electrons=c12.getByID(11);
       
-      if(c12.helonline() != NULL){
-        //cout << "helicity is not null" << endl;
-        //helicity = c12.helonline()->getHelicity();
-        //helicity = c12.event()->getHelicity();
-        //cout << "helicity is " << helicity << endl;
-      }
-      else{
-        //cout << "helicity is NULL"<<endl;
-      }
-      //if(debug) cout << "helicity" << endl;
       TLorentzVector el(0,0,0,db->GetParticle(11)->Mass());
       
-      /*mcpar_ptr mcparts;
-      if(isMC){
-        mcparts = c12.mcparts();
-        nhtracks_truth =0;
-        //skip the first two entries; these are the initial state particles
-        //the intermediate state particles are removed by the pid cuts
-        for(int kk = 2; kk<mcparts->getRows();kk++){
-          int pid = mcparts->getPid(kk);
-          if(debug) cout << pid << " ";
-          if(abs(pid)==211 || abs(pid) == 321 || abs(pid)==2212)
-            nhtracks_truth++;
-        }
-        if(debug) cout << endl;
-      }
-      */
+
       
       auto parts=c12.getDetParticles();
-      /*if(electrons.size() == 2){
-       if(debug) cout << "electrons" << endl;
-       if(debug) cout << electrons[0]->par()->getP() <<endl;
-       if(debug) cout << electrons[1]->par()->getP() <<endl;
-       }*/
+
+
+      int ntracks=0;
+
+      //cout << "counting tracks"<<endl;                                                                                                  
+      for(int kk = 0; kk<parts.size();kk++){
+	auto part = parts[kk];
+	int pid = part->getPid();
+	if(db->GetParticle(pid) == NULL || db->GetParticle(pid)->Charge() == 0)
+	  continue;
+	ntracks++;
+      }
+
+      if (ntracks>5)
+	continue;
       int nelectrons = electrons.size();
       int electrons_passCuts = 0;
       vector<int> matchedMCindices = {};
       //if(debug) cout <<"CHECK 0: " << nelectrons << " electrons" << endl;
       for(int i=0; i<nelectrons; i++){
-
-	bool Fdet_ok = 1;
-	bool FT_ok = 1;
+        
+        bool Fdet_ok = 1;
+        bool FT_ok = 1;
         if(debug) cout << "starting electron loop" << endl;
-        //if(debug) cout << "CHECK 0.5" << endl;
-        //if(electrons.size()>1) continue;
         int sector = electrons[i]->getSector();
         if(debug) cout << "electron in sector" << sector <<endl;
         
-        //e_DC1x=electrons[i]->traj(DC,DC1)->getX();
-        //e_DC1y=electrons[i]->traj(DC,DC1)->getY();
-        //e_DC2x=electrons[i]->traj(DC,DC3)->getX();
-        //e_DC2y=electrons[i]->traj(DC,DC3)->getY();
-        //e_DC3x=electrons[i]->traj(DC,DC6)->getX();
-        //e_DC3y=electrons[i]->traj(DC,DC6)->getY();
+
         if(debug) cout << "checking electron dc fid"<<endl;
         if(!dcOK(electrons[i],torus) || !pcalOK(electrons[i]))
           Fdet_ok = 0;
         if(debug) cout << "electron passes dc fid cuts" <<endl;
-        //if(debug) cout << "dc and pcal ok"<<endl;
-        //if(!dcok)
-        //  continue;
-        //if(debug) cout << "electron" << endl;
         
-        //the electron mass is a myth.  I could set this to zero and nothing would change.
-        //if(debug) cout << "CHECK 1" <<endl;
         SetLorentzVector(el,electrons[i], 0.000511);
         double e_p = el.P();
         double e_px = el.Px();
         double e_py = el.Py();
         double e_pz = el.Pz();
-        //if(debug) cout<< "e_p: " << e_p <<" "<< el.P() << endl;
         double e_th = el.Theta();
         double e_ph = el.Phi();
-        //if(theta*180/3.14159265 <=7)
-        //continue;
-        //if(p<0.01*E)
-        //continue;
         
-        //if(debug) cout << "CHECK 2"<<endl;
         double ecal = electrons[i]->getDetEnergy();
         
         double e_ecalfrac = ecal/e_p;
@@ -493,10 +436,6 @@ void MakeHistograms(){
         double e_PCALx = electrons[i]->cal(PCAL)->getX();
         double e_PCALy = electrons[i]->cal(PCAL)->getY();
         
-        //double sf1 = 0, sf2 = 0, sf3 = 0, sf4 = 0;
-        //double sfs1 =0, sfs2=0, sfs3 = 0, sfs4 = 0;
-        
-        if(debug) cout << sector << " " << sf1[sector] << " " <<sf2[sector] << " " <<sf3[sector] <<endl;
         
         //ecal fraction
         
@@ -526,23 +465,23 @@ void MakeHistograms(){
         if(useCuts && (e_vz<cut_evzmin || e_vz> cut_evzmax))
           Fdet_ok=0;
         
-	double nHTCC = electrons[i]->che(HTCC)->getNphe();
+        double nHTCC = electrons[i]->che(HTCC)->getNphe();
         if(nHTCC<=cut_HTCCmin)
           Fdet_ok=0;
-	
-	if (electrons[i]->ft(0)==NULL)
-	  FT_ok=0;
-	if (e_p<0.500 || e_th > 4.5*3.14159/180 || e_th<2.5*3.14159/180)
-	  FT_ok=0;
-	if (FT_ok)
-	  if(debug) cout << "electron from FT" << endl;
-	if (!(Fdet_ok || FT_ok))
-	  continue;
-	if (!Fdet_ok && DConly)
-	  continue;
-	if (!FT_ok && FTonly)
+        
+        if (electrons[i]->ft(0)==NULL)
+          FT_ok=0;
+        if (e_p<0.500 || e_th > 4.5*3.14159/180 || e_th<2.5*3.14159/180)
+          FT_ok=0;
+        if (FT_ok)
+          if(debug) cout << "electron from FT" << endl;
+        if (!(Fdet_ok || FT_ok))
           continue;
-
+        if (!Fdet_ok && DConly)
+          continue;
+        if (!FT_ok && FTonly)
+          continue;
+        
         //done with electron id cuts
         //cout << "check 2" <<endl;
         
@@ -554,171 +493,194 @@ void MakeHistograms(){
         double nu = (beam.E()-el.E());
         double y = nu/E;
         
-	// SIDIS cuts
-        //if(Q2<cut_Q2min)
-        //  continue;
-        //if(W<cut_Wmin)
-        //  continue;
-        //if(y > cut_ymax)
-        //  continue;
-	
-	//quasi-real cuts
-        double mrho=.775;
-	if (Q2>mrho*mrho)
-	  continue;
-	if (y < .70) //set this some margin away from the limit of 0.87
-	  continue;
 
+        
+        //quasi-real cuts
+        double mrho=.775;
+        if (Q2>mrho*mrho)
+          continue;
+        if (y < .70) //set this some margin away from the limit of 0.87
+          continue;
+        
         cm = beam+target-el;
         
         TLorentzVector target_cm;
         toCM(cm, target,target_cm);
-        //check that the cm outgoing electron has phi=0
-        //TLorentzVector tmp;
-        //toCM(cm, el,tmp);
-        //cout << tmp.Phi() << endl;
-        //toCM(cm, beam-el, tmp);
-        //cout << "  " << tmp.Theta() << endl;
-        
-        //auto parts=c12.getDetParticles();
+
         
         //double nHTCC = electrons[i]->che(HTCC)->getNphe();
         //if(nHTCC<=cut_HTCCmin)
         //  continue;
         
+        auto parts=c12.getDetParticles();
         
-        //if(debug) cout << "cm:"<<endl;
-        //cm.Print();
-        //npip = 0;
-        //npim = 0;
-        //npp = 0;
-        //npm = 0;
-        //nKp = 0;
-        //nKm = 0;
-        //nh = 0;
-
-        
-        
-                
-	auto parts=c12.getDetParticles();        
-        
-        //bool found_leader = 0;
         
         vector<int> accepted_indices;
-
-
+        
+        
         for(int j =0; j<parts.size();j++){
-	  if(debug) cout << "hadrons loop"<< endl;
-	  auto h = parts[j];
-
-	  auto h_pid = h->getPid();
-	  if(h_pid != 211 && h_pid != -211 && h_pid != 2212 && h_pid != -2212 && h_pid != 321 && h_pid != -321)
-	    continue;
-	  
-
-	  double dtime = electrons[i]->getTime()-h->getTime();
-	  bool useDCcuts=1;
-	  //if(debug) cout << "dc"<<endl;
-	  if(useDCcuts && !dcOK(h,torus))
-	    continue;
-	  
-	  //if(debug) cout << "pip" << endl;
-	  double mass = db->GetParticle(h_pid)->Mass();
-	  SetLorentzVector(had,h, mass);
-	  double h_p = had.P();
-	  double c = 29.9792458; //cm/ns
-	  auto dtime_corr =dtime-electrons[i]->getPath()/c+h->getPath()/(had.Beta()*c);
-	  if(abs(dtime_corr) > cut_dtime_corr)
-	    continue;
-	    
-            
-	  //h_pid = h->par()->getPid();
-	  auto h_chi2pid = h->par()->getChi2Pid();
-            
-	  //scaling constant for pid cut
-	  double C = .88*(h_pid == 211)+.93*(h_pid == -211)+ 1.30*(abs(h_pid)==2212)+1.0*(abs(h_pid) != 211 && abs(h_pid)!=2212);
-	  if(abs(h_chi2pid) >3*C)
-	    continue;
-	  
-	  //tighter cut for pions
-	  if(abs(h_pid) == 211 && h_p>2.44 && h_chi2pid >(0.00869+14.98587*exp(-h_p/1.18236)+1.81751*exp(-h_p/4.86394))*C)
-	    continue;
-	  
-	  auto dvz = electrons[i]->par()->getVz()-h->par()->getVz();
+          if(debug) cout << "hadrons loop"<< endl;
+          auto h = parts[j];
           
-	  if(dvz < cut_dvzmin || dvz > cut_dvzmax)
-	    continue;
-	  if (debug) cout << "accepted hadron" << h_pid << endl;
-	  accepted_indices.push_back(j);
+          auto h_pid = h->getPid();
+          if(h_pid != 211 && h_pid != -211 && h_pid != 2212 && h_pid != -2212 && h_pid != 321 && h_pid != -321)
+            continue;
+          
+          
+          double dtime = electrons[i]->getTime()-h->getTime();
+          bool useDCcuts=1;
+          //if(debug) cout << "dc"<<endl;
+          if(useDCcuts && !dcOK(h,torus))
+            continue;
+          
+          //if(debug) cout << "pip" << endl;
+          double mass = db->GetParticle(h_pid)->Mass();
+          SetLorentzVector(had,h, mass);
+          double h_p = had.P();
+          double c = 29.9792458; //cm/ns
+          auto dtime_corr =dtime-electrons[i]->getPath()/c+h->getPath()/(had.Beta()*c);
+          if(abs(dtime_corr) > cut_dtime_corr)
+            continue;
+          
+          
+          //h_pid = h->par()->getPid();
+          auto h_chi2pid = h->par()->getChi2Pid();
+          
+          //scaling constant for pid cut
+          double C = .88*(h_pid == 211)+.93*(h_pid == -211)+ 1.30*(abs(h_pid)==2212)+1.0*(abs(h_pid) != 211 && abs(h_pid)!=2212);
+          if(abs(h_chi2pid) >3*C)
+            continue;
+          
+          //tighter cut for pions
+          if(abs(h_pid) == 211 && h_p>2.44 && h_chi2pid >(0.00869+14.98587*exp(-h_p/1.18236)+1.81751*exp(-h_p/4.86394))*C)
+            continue;
+          
+          auto dvz = electrons[i]->par()->getVz()-h->par()->getVz();
+          
+          if(dvz < cut_dvzmin || dvz > cut_dvzmax)
+            continue;
+          if (debug) cout << "accepted hadron" << h_pid << endl;
+          accepted_indices.push_back(j);
         }
         double Kmass=db->GetParticle(321)->Mass();
-	double pimass=db->GetParticle(211)->Mass();
-	double pmass=db->GetParticle(2212)->Mass();
-	for(int j = 0; j< accepted_indices.size();j++){
-	  auto part = parts[accepted_indices[j]];
-	  if (part->getPid()==321)
+        double pimass=db->GetParticle(211)->Mass();
+        double pmass=db->GetParticle(2212)->Mass();
+
+	// D0 bar
+        for(int j = 0; j< accepted_indices.size();j++){
+          auto part = parts[accepted_indices[j]];
+          if (part->getPid()==321)
+          {
+            if (debug) cout << "accepted K+" << endl;
+            for(int k = 0; k< accepted_indices.size();k++){
+              auto part2 = parts[accepted_indices[k]];
+              if(part2->getPid()==-211){
+                if (debug) cout << "accepted pi-" << endl;
+                TLorentzVector Kp;
+                TLorentzVector pim;
+                SetLorentzVector(Kp,part, Kmass);
+                SetLorentzVector(pim,part2,pimass);
+                double invmass = (Kp+pim).M();
+                if(debug) cout << "pair mass "  << invmass <<  endl;
+                invmass_Kp_pim->Fill(invmass);
+		invmass_Kp_pim_zoom->Fill(invmass);
+                double missmass = (target+beam-el-Kp-pim).M();
+                missingmass_Kp_pim->Fill(missmass);
+                Kp_pim_2d->Fill(invmass, missmass);
+                Kp_pim_2d_zoom->Fill(invmass, missmass);
+              }
+            }
+          }
+          
+        }
+
+	// D0 bar
+        for(int j = 0; j< accepted_indices.size();j++){
+          auto part = parts[accepted_indices[j]];
+          if (part->getPid()==-321)
 	    {
-	      if (debug) cout << "accepted K+" << endl;
+	      if (debug) cout << "accepted K-" << endl;
 	      for(int k = 0; k< accepted_indices.size();k++){
 		auto part2 = parts[accepted_indices[k]];
-		if(part2->getPid()==-211){
-		  if (debug) cout << "accepted pi-" << endl;
-		  TLorentzVector Kp;
-		  TLorentzVector pim;
-		  SetLorentzVector(Kp,part, Kmass);
-		  SetLorentzVector(pim,part2,pimass);
-		  double invmass = (Kp+pim).M();
+		if(part2->getPid()==211){
+		  if (debug) cout << "accepted pi+" << endl;
+		  TLorentzVector Km;
+		  TLorentzVector pip;
+		  SetLorentzVector(Km,part, Kmass);
+		  SetLorentzVector(pip,part2,pimass);
+		  double invmass = (Km+pip).M();
 		  if(debug) cout << "pair mass "  << invmass <<  endl;
-		  invmass_Kp_pim->Fill(invmass);
-		  double missmass = (target+beam-el-Kp-pim).M();
-		  missingmass_Kp_pim->Fill(missmass);
-		  Kp_pim_2d->Fill(invmass, missmass);
-		  Kp_pim_2d_zoom->Fill(invmass, missmass);
+		  invmass_Km_pip->Fill(invmass);
+		  double missmass = (target+beam-el-Km-pip).M();
+		  missingmass_Km_pip->Fill(missmass);
+		  Km_pip_2d->Fill(invmass, missmass);
+		  Km_pip_2d_zoom->Fill(invmass, missmass);
 		}
 	      }
 	    }
-	  
-	}
-	//cout << target.M() << "xxxxx"<< target.E()<< endl;
-	//cout << beam.Pz() << "yyyy" << beam.E() << endl;
-	//cout << el.Pz()  << "yyyy"  << el.E() << endl;
-	//cout <<  "zzzz"  << el.Theta()/3.14159*180 << endl;
-	for(int j = 0; j< accepted_indices.size();j++){
+
+        }
+
+
+	// Lambda c
+        for(int j = 0; j< accepted_indices.size();j++){
           auto part = parts[accepted_indices[j]];
           if (part->getPid()==-321)
-            {
-              if (debug) cout << "accepted K-" << endl;
-              for(int k = 0; k< accepted_indices.size();k++){
-                auto part2 = parts[accepted_indices[k]];
-                if(part2->getPid()==211){
-                  if (debug) cout << "accepted pi+" << endl;
-		  for(int l = 0; l< accepted_indices.size();l++){
-		    auto part3 = parts[accepted_indices[l]];
-		    if(part3->getPid()==2212){
-		      if (debug) cout << "accepted p" << endl;
-		      TLorentzVector Km;
-		      TLorentzVector pip;
-		      TLorentzVector prot;
-		      SetLorentzVector(Km,part, Kmass);
-		      SetLorentzVector(pip,part2,pimass);
-                      SetLorentzVector(prot,part3,pmass);
-		      double invmass = sqrt((Km+pip+prot)*(Km+pip+prot));
-		      if (debug) cout << "pair mass "  << invmass <<  endl;
-		      invmass_Km_pip_p->Fill(invmass);
-		      double missmass = (target+beam-el-Km-pip-prot).M(); 
-		      missingmass_Km_pip_p->Fill(missmass);
-		      Km_pip_p_2d->Fill(invmass, missmass);
-		      Km_pip_p_2d_zoom->Fill(invmass, missmass);
-		    }
-		  }
+          {
+            if (debug) cout << "accepted K-" << endl;
+            for(int k = 0; k< accepted_indices.size();k++){
+              auto part2 = parts[accepted_indices[k]];
+              if(part2->getPid()==211){
+                if (debug) cout << "accepted pi+" << endl;
+                for(int l = 0; l< accepted_indices.size();l++){
+                  auto part3 = parts[accepted_indices[l]];
+                  if(part3->getPid()==2212){
+                    if (debug) cout << "accepted p" << endl;
+                    TLorentzVector Km;
+                    TLorentzVector pip;
+                    TLorentzVector prot;
+                    SetLorentzVector(Km,part, Kmass);
+                    SetLorentzVector(pip,part2,pimass);
+                    SetLorentzVector(prot,part3,pmass);
+                    double invmass = sqrt((Km+pip+prot)*(Km+pip+prot));
+                    if (debug) cout << "pair mass "  << invmass <<  endl;
+                    invmass_Km_pip_p->Fill(invmass);
+                    double missmass = (target+beam-el-Km-pip-prot).M();
+                    missingmass_Km_pip_p->Fill(missmass);
+                    Km_pip_p_2d->Fill(invmass, missmass);
+                    Km_pip_p_2d_zoom->Fill(invmass, missmass);
+                  }
                 }
               }
             }
-
+          }
+          
+        }
+	// Lambda
+	for(int j = 0; j< accepted_indices.size();j++){
+          auto part = parts[accepted_indices[j]];
+          if (part->getPid()==2212) {
+	    if (debug) cout << "accepted p" << endl;
+	    for(int k = 0; k< accepted_indices.size();k++){
+	      auto part2 = parts[accepted_indices[k]];
+	      if(part2->getPid()==-211){
+		if (debug) cout << "accepted pi-" << endl;
+		
+		TLorentzVector pim;
+		TLorentzVector prot;
+		
+		SetLorentzVector(pim,part2,pimass);
+		SetLorentzVector(prot,part,pmass);
+		double invmass = (pim+prot).M();
+		if (debug) cout << "pair mass "  << invmass <<  endl;
+		invmass_pim_p->Fill(invmass);
+		invmass_pim_p_zoom->Fill(invmass);
+		
+	      }
+	    }
+	  }
 	}
-	
-      }
-      
+      }    
     }
   }
   gBenchmark->Stop("timer");
@@ -727,14 +689,26 @@ void MakeHistograms(){
   //hm2gCut->DrawCopy("same");
   TFile *f = new TFile(outputFile,"RECREATE");
   
+  //D0 bar
   missingmass_Kp_pim->Write();
   invmass_Kp_pim->Write();
+  invmass_Kp_pim_zoom->Write();
   Kp_pim_2d->Write();
   Kp_pim_2d_zoom->Write();
+  //lambda c
   missingmass_Km_pip_p->Write();
   invmass_Km_pip_p->Write();
   Km_pip_p_2d->Write();
   Km_pip_p_2d_zoom->Write();
+  //lambda
+  invmass_pim_p->Write();
+  invmass_pim_p_zoom->Write();
+  //D0
+  missingmass_Km_pip->Write();
+  invmass_Km_pip->Write();
+  Km_pip_2d->Write();
+  Km_pip_2d_zoom->Write();
+
   f->Close();
   
   
