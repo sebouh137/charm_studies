@@ -169,7 +169,14 @@ void MakeHistograms(){
   //2=K-pi+p
   //3=K+pi-p
   leaf(topo);
- 
+
+  //count the number of each of these types of particles
+  leaf(n_pim);
+  leaf(n_pip);
+  leaf(n_p);
+  leaf(n_Kp);
+  leaf(n_Km);
+
 //macro to create one column for each particle.  
 #define leaf3(name) leaf(K_##name); leaf(pi_##name); leaf(prot_##name);
 
@@ -582,7 +589,8 @@ void MakeHistograms(){
         
         vector<int> accepted_indices;
         
-        
+	n_pip=0; n_pim=0;n_Kp=0;n_Km=0; n_p=0;
+
         for(int j =0; j<parts.size();j++){
           if(debug) cout << "hadrons loop"<< endl;
           auto h = parts[j];
@@ -626,6 +634,13 @@ void MakeHistograms(){
             continue;
           if (debug) cout << "accepted hadron" << h_pid << endl;
           accepted_indices.push_back(j);
+	  
+	  if (h_pid==211) n_pip+=1;
+	  if (h_pid==-211) n_pim+=1;
+	  if (h_pid==321) n_Kp+=1;
+          if (h_pid==-321) n_Km+=1;
+	  if (h_pid==2212) n_p+=1;
+
 
 	  if (abs(h_pid)==211 or abs(h_pid)==321 or abs(h_pid)==11 or h_pid==2212){
 	    singleParticle2d[h_pid]->Fill(h_p, had.Theta()*180/3.14159);
