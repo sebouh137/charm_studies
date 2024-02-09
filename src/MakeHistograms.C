@@ -109,8 +109,8 @@ bool acceptHadron(clas12::region_particle * h, clas12::region_particle * electro
   
   double dtime = electron->getTime()-h->getTime();
 
-  if(!dcOK(h,torus))
-    return false;
+  //if(!dcOK(h,torus)) //|| had.Theta>35*3.14159/180)
+  //  return false;
   
   //if(debug) cout << "pip" << endl;
   double mass = db->GetParticle(h_pid)->Mass();
@@ -145,8 +145,45 @@ bool acceptHadron(clas12::region_particle * h, clas12::region_particle * electro
 void MakeHistograms(){
   // Record start time
   auto start = std::chrono::high_resolution_clock::now();
+  //macro to create a single column
+#define leaf(name) double name=0;  tree->Branch(#name,&name,#name+(TString)"/D");
+  TTree* tree = new TTree("events","events");
+  leaf(Q2);
+  leaf(W);
+  leaf(x);
+  leaf(nu);
+  leaf(y);
   
-  
+  leaf(e_p);
+  leaf(e_px);
+  leaf(e_py);
+  leaf(e_pz);
+  leaf(e_ph);
+  leaf(e_th);
+  leaf(e_E);
+
+  leaf(invmass);
+  leaf(missmass);
+  //0=K+pi-
+  //1=K-pi+
+  //2=K-pi+p
+  //3=K+pi-p
+  leaf(topo);
+ 
+//macro to create one column for each particle.  
+#define leaf3(name) leaf(K_##name); leaf(pi_##name); leaf(prot_##name);
+
+  leaf3(p);
+  leaf3(px);
+  leaf3(py);
+  leaf3(pz);
+  leaf3(E);
+  leaf3(ph);
+  leaf3(th);
+#define fillVec(v,pref) pref##_p=v.P(); pref##_px=v.Px(); pref##_py=v.Py(); pref##_pz=v.Pz(); pref##_E=v.E(); pref##_th=v.Theta(); pref##_ph=v.Phi();
+#define blankVec(pref) pref##_p=0; pref##_px=0; pref##_py=0; pref##_pz=0; pref##_E=0; pref##_th=0; pref##_ph=0;
+
+
   /////////////////////////////////////
   //ignore this just getting file name!
   
@@ -163,28 +200,51 @@ void MakeHistograms(){
   TLorentzVector had;
 
   //D0bar recon
-  TH1* invmass_Kp_pim = new TH1D("Kp_pim_invmass", "pair mass K+pi-;m_{K^{+}#pi^{-}} [GeV];events",500, 0, 10);
+  TH1* invmass_Kp_pim = new TH1D("Kp_pim_invmass", "pair mass K+pi-;m_{K^{+}#pi^{-}} [GeV];events",2000, 0, 10);
   TH1* invmass_Kp_pim_zoom = new TH1D("Kp_pim_invmass_zoom", "pair mass K+pi-;m_{K^{+}#pi^{-}} [GeV];events",500, 1.5, 2.0);
-  TH1* missingmass_Kp_pim = new TH1D("Kp_pim_missmass", "missing mass K+pi-;m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events",500, -10, 10);
-  TH2* Kp_pim_2d = new TH2D("Kp_pim_2d", "invariant vs missing mass K+pi-;m_{K^{+}#pi^{-}} [GeV];m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events",500,0, 10, 500, -10, 10);
+  TH1* missingmass_Kp_pim = new TH1D("Kp_pim_missmass", "missing mass K+pi-;m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events",2000, -10, 10);
+  TH2* Kp_pim_2d = new TH2D("Kp_pim_2d", "invariant vs missing mass K+pi-;m_{K^{+}#pi^{-}} [GeV];m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events",2000,0, 10, 2000, -10, 10);
   TH2* Kp_pim_2d_zoom=new TH2D("Kp_pim_2d_zoom", "invariant vs missing mass K+pi-;m_{K^{+}#pi^{-}} [GeV];m_{X}(ep,e'K^{+}#pi^{-}X) [GeV];events", 500, 1.5, 2, 500, 2.0, 2.5);
-  
+  TH2* invmass_Kp_pim_vs_W = new TH2D("Kp_pim_invmass_vs_w", "pair mass K+pi-;m_{K^{+}#pi^{-}} [GeV];W [GeV]",500, 0, 10,100, 0, 10);
+
+
   //Lambda c recon
-  TH1* invmass_Km_pip_p = new TH1D("Km_pip_p_invmass", "pair mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];events",500, 0, 10);
-  TH1* missingmass_Km_pip_p = new TH1D("Km_pip_p_missmass", "missing mass K-pi+p;m_{X}(ep,e'K^{-}#pi^{+}pX) [GeV];events",500, -10, 10);
-  TH2* Km_pip_p_2d = new TH2D("Km_pip_p_2d", "invariant vs missing mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];m_{X}(ep,e'K^{+}#pi^{-}p'X) [GeV];events",500,0, 10, 500, -10, 10);
+  TH1* invmass_Km_pip_p = new TH1D("Km_pip_p_invmass", "pair mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];events",2000, 0, 10);
+  TH1* missingmass_Km_pip_p = new TH1D("Km_pip_p_missmass", "missing mass K-pi+p;m_{X}(ep,e'K^{-}#pi^{+}pX) [GeV];events",2000, -10, 10);
+  TH2* Km_pip_p_2d = new TH2D("Km_pip_p_2d", "invariant vs missing mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];m_{X}(ep,e'K^{+}#pi^{-}p'X) [GeV];events",2000,0, 10, 2000, -10, 10);
   TH2* Km_pip_p_2d_zoom = new TH2D("Km_pip_p_2d_zoom", "invariant vs missing mass K-pi+p;m_{K^{-}#pi^{+}p} [GeV];m_{X}(ep,e'K^{+}#pi^{-}p'X) [GeV];events",500,2.0, 2.5, 500, 1.5, 2);
-  
+  TH2* invmass_Km_pip_p_vs_W = new TH2D("Km_pip_p_invmass_vs_w", "pair mass K+pi-;m_{K^{-}#pi^{+}p} [GeV];W [GeV]",2000, 0, 10,100, 0, 10);
+
 
   //Lambda recon
-  TH1* invmass_pim_p = new TH1D("pim_p_invmass", "pair mass pi-p;m_{#pi{-}p} [GeV];events",500, 0, 5);
+  TH1* invmass_pim_p = new TH1D("pim_p_invmass", "pair mass pi-p;m_{#pi{-}p} [GeV];events",1000, 0, 5);
   TH1* invmass_pim_p_zoom = new TH1D("pim_p_invmass_zoom", "pair mass pi-p;m_{#pi{-}p} [GeV];events",500, 1.05, 1.30);
 
   //D0 recon (not D0 bar)
-  TH1* invmass_Km_pip = new TH1D("Km_pip_invmass", "pair mass K-pi+;m_{K^{-}#pi^{+}} [GeV];events",500, 0, 10);
-  TH1* missingmass_Km_pip = new TH1D("Km_pip_missmass", "missing mass K-pi+;m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events",500, -10, 10);
-  TH2* Km_pip_2d = new TH2D("Km_pip_2d", "invariant vs missing mass K-pi+;m_{K^{-}#pi^{+}} [GeV];m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events",500,0, 10, 500, -10, 10);
+  TH1* invmass_Km_pip = new TH1D("Km_pip_invmass", "pair mass K-pi+;m_{K^{-}#pi^{+}} [GeV];events",2000, 0, 10);
+  TH1* missingmass_Km_pip = new TH1D("Km_pip_missmass", "missing mass K-pi+;m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events",2000, -10, 10);
+  TH2* Km_pip_2d = new TH2D("Km_pip_2d", "invariant vs missing mass K-pi+;m_{K^{-}#pi^{+}} [GeV];m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events",2000,0, 10, 2000, -10, 10);
   TH2* Km_pip_2d_zoom=new TH2D("Km_pip_2d_zoom", "invariant vs missing mass K-pi+;m_{K^{-}#pi^{+}} [GeV];m_{X}(ep,e'K^{-}#pi^{+}X) [GeV];events", 500, 1.5, 2, 500, 2.0, 2.5);
+  TH2* invmass_Km_pip_vs_W = new TH2D("Km_pip_invmass_vs_w", "pair mass K-pi+;m_{K^{-}#pi^{+}} [GeV];W [GeV]",2000, 0, 10,100, 0, 10);
+  TH1* invmass_Km_pip_zoom = new TH1D("Km_pip_invmass_zoom", "pair mass K-pi+;m_{K^{-}#pi^{+}} [GeV];events",500, 1.5, 2.0);
+  
+
+  std::map<int, TH2*> singleParticle2d;
+  std::map<int, TH1*> singleParticle_p;
+  std::map<int, TH1*> singleParticle_theta;
+
+  // Loop through the list using a range-based for loop
+  for (const int pid : {11,211,2212,321,-11,-211,-321}){
+    singleParticle2d[pid]=new TH2D(("pvstheta"+std::to_string(pid)).c_str(),("p vs theta "+std::to_string(pid)+";P [GeV];#Theta [deg]").c_str(), 100, 0, 10, 180, 0, 180);
+    singleParticle_theta[pid]=new TH1D(("theta"+std::to_string(pid)).c_str(),("theta "+std::to_string(pid)+";#Theta [deg];events").c_str(), 180, 0, 180);
+    singleParticle_p[pid]=new TH1D(("p"+std::to_string(pid)).c_str(),("p "+std::to_string(pid)+";P [GeV];events").c_str(), 100, 0, 10);
+  }
+
+  // leptonic variables
+  TH1* h_nu = new TH1D("nu", "#nu;#nu [GeV];events", 100, 0, 11);
+  TH1* h_Q2 = new TH1D("Q2", "Q^{2};Q^{2} [GeV^2];events", 100,0, 11);
+  TH1* h_W = new TH1D("W", "W;W [GeV];events", 100, 0, 11);
+  TH2* h_Q2_nu = new TH2D("Q2_nu", "Q^{2} vs #nu;Q^{2} [GeV^2];#nu [GeV]",100, 0, 11, 100, 0, 11);
 
   for(Int_t ii=1;ii<gApplication->Argc();ii++){
     TString opt=gApplication->Argv(ii);
@@ -420,12 +480,12 @@ void MakeHistograms(){
         if(debug) cout << "electron passes dc fid cuts" <<endl;
         
         SetLorentzVector(el,electrons[i], 0.000511);
-        double e_p = el.P();
-        double e_px = el.Px();
-        double e_py = el.Py();
-        double e_pz = el.Pz();
-        double e_th = el.Theta();
-        double e_ph = el.Phi();
+        e_p = el.P();
+        e_px = el.Px();
+        e_py = el.Py();
+        e_pz = el.Pz();
+        e_th = el.Theta();
+        e_ph = el.Phi();
         
         double ecal = electrons[i]->getDetEnergy();
         
@@ -487,11 +547,11 @@ void MakeHistograms(){
         
         //if(debug) cout << "now for electron kinematics cuts"<<endl;
         // now for electron kinematics cuts
-        double Q2 = -(beam-el)*(beam-el);
-        double W = (target+beam-el).M();
-        double x = Q2/(2*target.M()*(beam.E()-el.E()));
-        double nu = (beam.E()-el.E());
-        double y = nu/E;
+        Q2 = -(beam-el)*(beam-el);
+        W = (target+beam-el).M();
+        x = Q2/(2*target.M()*(beam.E()-el.E()));
+        nu = (beam.E()-el.E());
+        y = nu/E;
         
 
         
@@ -499,9 +559,14 @@ void MakeHistograms(){
         double mrho=.775;
         if (Q2>mrho*mrho)
           continue;
-        if (y < .70) //set this some margin away from the limit of 0.87
+        if (nu<8) 
           continue;
         
+	h_Q2->Fill(Q2);
+	h_nu->Fill(nu);
+	h_Q2_nu->Fill(Q2, nu);
+	h_W->Fill(W);
+
         cm = beam+target-el;
         
         TLorentzVector target_cm;
@@ -528,7 +593,7 @@ void MakeHistograms(){
           
           
           double dtime = electrons[i]->getTime()-h->getTime();
-          bool useDCcuts=1;
+          bool useDCcuts=0;
           //if(debug) cout << "dc"<<endl;
           if(useDCcuts && !dcOK(h,torus))
             continue;
@@ -561,6 +626,13 @@ void MakeHistograms(){
             continue;
           if (debug) cout << "accepted hadron" << h_pid << endl;
           accepted_indices.push_back(j);
+
+	  if (abs(h_pid)==211 or abs(h_pid)==321 or abs(h_pid)==11 or h_pid==2212){
+	    singleParticle2d[h_pid]->Fill(h_p, had.Theta()*180/3.14159);
+	    singleParticle_theta[h_pid]->Fill(had.Theta()*180/3.14159);
+            singleParticle_p[h_pid]->Fill(had.P());
+	  }
+
         }
         double Kmass=db->GetParticle(321)->Mass();
         double pimass=db->GetParticle(211)->Mass();
@@ -580,14 +652,20 @@ void MakeHistograms(){
                 TLorentzVector pim;
                 SetLorentzVector(Kp,part, Kmass);
                 SetLorentzVector(pim,part2,pimass);
-                double invmass = (Kp+pim).M();
+                invmass = (Kp+pim).M();
                 if(debug) cout << "pair mass "  << invmass <<  endl;
                 invmass_Kp_pim->Fill(invmass);
 		invmass_Kp_pim_zoom->Fill(invmass);
-                double missmass = (target+beam-el-Kp-pim).M();
+		invmass_Kp_pim_vs_W->Fill(invmass, W);
+                missmass = (target+beam-el-Kp-pim).M();
                 missingmass_Kp_pim->Fill(missmass);
                 Kp_pim_2d->Fill(invmass, missmass);
                 Kp_pim_2d_zoom->Fill(invmass, missmass);
+		topo=0;
+		fillVec(Kp,K);
+		fillVec(pim,pi);
+		blankVec(prot);
+		tree->Fill();
               }
             }
           }
@@ -608,13 +686,20 @@ void MakeHistograms(){
 		  TLorentzVector pip;
 		  SetLorentzVector(Km,part, Kmass);
 		  SetLorentzVector(pip,part2,pimass);
-		  double invmass = (Km+pip).M();
+		  invmass = (Km+pip).M();
 		  if(debug) cout << "pair mass "  << invmass <<  endl;
 		  invmass_Km_pip->Fill(invmass);
-		  double missmass = (target+beam-el-Km-pip).M();
+		  invmass_Km_pip_zoom->Fill(invmass);
+		  invmass_Km_pip_vs_W->Fill(invmass, W);
+		  missmass = (target+beam-el-Km-pip).M();
 		  missingmass_Km_pip->Fill(missmass);
 		  Km_pip_2d->Fill(invmass, missmass);
 		  Km_pip_2d_zoom->Fill(invmass, missmass);
+		  fillVec(Km,K);
+		  fillVec(pip,pi);
+		  blankVec(prot);
+		  topo=1;
+		  tree->Fill();
 		}
 	      }
 	    }
@@ -642,13 +727,19 @@ void MakeHistograms(){
                     SetLorentzVector(Km,part, Kmass);
                     SetLorentzVector(pip,part2,pimass);
                     SetLorentzVector(prot,part3,pmass);
-                    double invmass = sqrt((Km+pip+prot)*(Km+pip+prot));
+                    invmass = sqrt((Km+pip+prot)*(Km+pip+prot));
                     if (debug) cout << "pair mass "  << invmass <<  endl;
                     invmass_Km_pip_p->Fill(invmass);
-                    double missmass = (target+beam-el-Km-pip-prot).M();
+		    invmass_Km_pip_p_vs_W->Fill(invmass, W);
+                    missmass = (target+beam-el-Km-pip-prot).M();
                     missingmass_Km_pip_p->Fill(missmass);
                     Km_pip_p_2d->Fill(invmass, missmass);
                     Km_pip_p_2d_zoom->Fill(invmass, missmass);
+		    fillVec(Km,K);
+		    fillVec(pip,pi);
+		    fillVec(prot,prot);
+		    topo=2;
+		    tree->Fill();
                   }
                 }
               }
@@ -671,11 +762,16 @@ void MakeHistograms(){
 		
 		SetLorentzVector(pim,part2,pimass);
 		SetLorentzVector(prot,part,pmass);
-		double invmass = (pim+prot).M();
+		invmass = (pim+prot).M();
+		missmass = (target+beam-el-pim-prot).M();
 		if (debug) cout << "pair mass "  << invmass <<  endl;
 		invmass_pim_p->Fill(invmass);
 		invmass_pim_p_zoom->Fill(invmass);
-		
+		topo=4;
+		fillVec(pim,pi);
+		fillVec(prot, prot);
+		blankVec(K);
+		tree->Fill();
 	      }
 	    }
 	  }
@@ -688,16 +784,18 @@ void MakeHistograms(){
   //hm2gCut->SetLineColor(2);
   //hm2gCut->DrawCopy("same");
   TFile *f = new TFile(outputFile,"RECREATE");
-  
+  tree->Write();
   //D0 bar
   missingmass_Kp_pim->Write();
   invmass_Kp_pim->Write();
+  invmass_Kp_pim_vs_W->Write();
   invmass_Kp_pim_zoom->Write();
   Kp_pim_2d->Write();
   Kp_pim_2d_zoom->Write();
   //lambda c
   missingmass_Km_pip_p->Write();
   invmass_Km_pip_p->Write();
+  invmass_Km_pip_p_vs_W->Write();
   Km_pip_p_2d->Write();
   Km_pip_p_2d_zoom->Write();
   //lambda
@@ -705,9 +803,23 @@ void MakeHistograms(){
   invmass_pim_p_zoom->Write();
   //D0
   missingmass_Km_pip->Write();
+  invmass_Km_pip_zoom->Write();
   invmass_Km_pip->Write();
+  invmass_Km_pip_vs_W->Write();
   Km_pip_2d->Write();
   Km_pip_2d_zoom->Write();
+  invmass_Km_pip_zoom->Write();
+  for (const int pid : {11,211,2212,321,-11,-211,-321}){
+    singleParticle2d[pid]->Write();
+    singleParticle_p[pid]->Write();
+    singleParticle_theta[pid]->Write();
+  }
+
+  //lepton variables
+  h_nu->Write();
+  h_W->Write();
+  h_Q2->Write();
+  h_Q2_nu->Write();
 
   f->Close();
   
