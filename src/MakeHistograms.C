@@ -493,7 +493,8 @@ void MakeHistograms(){
         e_pz = el.Pz();
         e_th = el.Theta();
         e_ph = el.Phi();
-        
+	e_E = el.E();
+
         double ecal = electrons[i]->getDetEnergy();
         
         double e_ecalfrac = ecal/e_p;
