@@ -190,7 +190,11 @@ void MakeHistograms(){
 #define fillVec(v,pref) pref##_p=v.P(); pref##_px=v.Px(); pref##_py=v.Py(); pref##_pz=v.Pz(); pref##_E=v.E(); pref##_th=v.Theta(); pref##_ph=v.Phi();
 #define blankVec(pref) pref##_p=0; pref##_px=0; pref##_py=0; pref##_pz=0; pref##_E=0; pref##_th=0; pref##_ph=0;
 
-
+  //time
+  //leaf(e_t);
+  leaf(prot_dt);
+  leaf(K_dt);
+  leaf(pi_dt);
   /////////////////////////////////////
   //ignore this just getting file name!
   
@@ -466,8 +470,8 @@ void MakeHistograms(){
 	ntracks++;
       }
 
-      if (ntracks>5)
-	continue;
+      //if (ntracks>5)
+      //  continue;
       int nelectrons = electrons.size();
       int electrons_passCuts = 0;
       vector<int> matchedMCindices = {};
@@ -589,7 +593,7 @@ void MakeHistograms(){
         
         
         vector<int> accepted_indices;
-        
+        map<int, double> dtime_map;
 	n_pip=0; n_pim=0;n_Kp=0;n_Km=0; n_p=0;
 
         for(int j =0; j<parts.size();j++){
@@ -615,7 +619,7 @@ void MakeHistograms(){
           auto dtime_corr =dtime-electrons[i]->getPath()/c+h->getPath()/(had.Beta()*c);
           if(abs(dtime_corr) > cut_dtime_corr)
             continue;
-          
+          dtime_map[j]=dtime_corr;
           
           //h_pid = h->par()->getPid();
           auto h_chi2pid = h->par()->getChi2Pid();
@@ -681,6 +685,10 @@ void MakeHistograms(){
 		fillVec(Kp,K);
 		fillVec(pim,pi);
 		blankVec(prot);
+		
+		prot_dt=0; K_dt=dtime_map[accepted_indices[j]];
+		pi_dt=dtime_map[accepted_indices[k]];
+
 		tree->Fill();
               }
             }
@@ -688,7 +696,7 @@ void MakeHistograms(){
           
         }
 
-	// D0 bar
+	// D0 
         for(int j = 0; j< accepted_indices.size();j++){
           auto part = parts[accepted_indices[j]];
           if (part->getPid()==-321)
@@ -714,6 +722,8 @@ void MakeHistograms(){
 		  fillVec(Km,K);
 		  fillVec(pip,pi);
 		  blankVec(prot);
+		  prot_dt=0; K_dt=dtime_map[accepted_indices[j]];
+		  pi_dt=dtime_map[accepted_indices[k]];
 		  topo=1;
 		  tree->Fill();
 		}
@@ -743,7 +753,7 @@ void MakeHistograms(){
                     SetLorentzVector(Km,part, Kmass);
                     SetLorentzVector(pip,part2,pimass);
                     SetLorentzVector(prot,part3,pmass);
-                    invmass = sqrt((Km+pip+prot)*(Km+pip+prot));
+                    invmass = (Km+pip+prot).M();
                     if (debug) cout << "pair mass "  << invmass <<  endl;
                     invmass_Km_pip_p->Fill(invmass);
 		    invmass_Km_pip_p_vs_W->Fill(invmass, W);
@@ -754,6 +764,9 @@ void MakeHistograms(){
 		    fillVec(Km,K);
 		    fillVec(pip,pi);
 		    fillVec(prot,prot);
+		    prot_dt=dtime_map[accepted_indices[l]];
+		    K_dt=dtime_map[accepted_indices[j]];
+		    pi_dt=dtime_map[accepted_indices[k]];
 		    topo=2;
 		    tree->Fill();
                   }
@@ -784,6 +797,9 @@ void MakeHistograms(){
 		invmass_pim_p->Fill(invmass);
 		invmass_pim_p_zoom->Fill(invmass);
 		topo=4;
+		prot_dt=dtime_map[accepted_indices[j]];
+		K_dt=0;
+		pi_dt=dtime_map[accepted_indices[k]];
 		fillVec(pim,pi);
 		fillVec(prot, prot);
 		blankVec(K);
