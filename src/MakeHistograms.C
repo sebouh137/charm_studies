@@ -161,6 +161,9 @@ void MakeHistograms(){
   leaf(e_ph);
   leaf(e_th);
   leaf(e_E);
+  leaf(e_vx);
+  leaf(e_vy);
+  leaf(e_vz);
 
   leaf(invmass);
   leaf(missmass);
@@ -187,6 +190,10 @@ void MakeHistograms(){
   leaf3(E);
   leaf3(ph);
   leaf3(th);
+  leaf3(vx);
+  leaf3(vy);
+  leaf3(vz);
+
 #define fillVec(v,pref) pref##_p=v.P(); pref##_px=v.Px(); pref##_py=v.Py(); pref##_pz=v.Pz(); pref##_E=v.E(); pref##_th=v.Theta(); pref##_ph=v.Phi();
 #define blankVec(pref) pref##_p=0; pref##_px=0; pref##_py=0; pref##_pz=0; pref##_E=0; pref##_th=0; pref##_ph=0;
 
@@ -195,6 +202,8 @@ void MakeHistograms(){
   leaf(prot_dt);
   leaf(K_dt);
   leaf(pi_dt);
+
+  leaf(evt_num); leaf(run_num);
   /////////////////////////////////////
   //ignore this just getting file name!
   
@@ -428,8 +437,8 @@ void MakeHistograms(){
           auto schema = dict.getSchema("RUN::config");
           hipo::bank bank(schema);
           c12.getStructure(&bank);
-          //evt_num = bank.getInt(schema.getEntryOrder("event"),0);
-          //run_num = bank.getInt(schema.getEntryOrder("run"),0);
+          evt_num = bank.getInt(schema.getEntryOrder("event"),0);
+          run_num = bank.getInt(schema.getEntryOrder("run"),0);
         }
         
       }
@@ -498,7 +507,6 @@ void MakeHistograms(){
         e_th = el.Theta();
         e_ph = el.Phi();
 	e_E = el.E();
-
         double ecal = electrons[i]->getDetEnergy();
         
         double e_ecalfrac = ecal/e_p;
@@ -532,7 +540,9 @@ void MakeHistograms(){
           Fdet_ok=0;
         //if(debug) cout << "/electron"<<endl;
         
-        double e_vz = electrons[i]->par()->getVz();
+	e_vx = electrons[i]->par()->getVx();
+	e_vy = electrons[i]->par()->getVy();
+        e_vz = electrons[i]->par()->getVz();
         
         if(useCuts && (e_vz<cut_evzmin || e_vz> cut_evzmax))
           Fdet_ok=0;
@@ -594,6 +604,9 @@ void MakeHistograms(){
         
         vector<int> accepted_indices;
         map<int, double> dtime_map;
+	map<int, double> vx_map;
+	map<int, double> vy_map;
+	map<int, double> vz_map;
 	n_pip=0; n_pim=0;n_Kp=0;n_Km=0; n_p=0;
 
         for(int j =0; j<parts.size();j++){
@@ -632,11 +645,13 @@ void MakeHistograms(){
           //tighter cut for pions
           if(abs(h_pid) == 211 && h_p>2.44 && h_chi2pid >(0.00869+14.98587*exp(-h_p/1.18236)+1.81751*exp(-h_p/4.86394))*C)
             continue;
+          vx_map[j]=h->par()->getVx();
+	  vy_map[j]=h->par()->getVy();
+	  vz_map[j]=h->par()->getVz();
+          //auto dvz = electrons[i]->par()->getVz()-h->par()->getVz();
           
-          auto dvz = electrons[i]->par()->getVz()-h->par()->getVz();
-          
-          if(dvz < cut_dvzmin || dvz > cut_dvzmax)
-            continue;
+          //if(dvz < cut_dvzmin || dvz > cut_dvzmax)
+          //  continue;
           if (debug) cout << "accepted hadron" << h_pid << endl;
           accepted_indices.push_back(j);
 	  
@@ -686,9 +701,18 @@ void MakeHistograms(){
 		fillVec(pim,pi);
 		blankVec(prot);
 		
+		
 		prot_dt=0; K_dt=dtime_map[accepted_indices[j]];
 		pi_dt=dtime_map[accepted_indices[k]];
-
+		
+		K_vx=vx_map[accepted_indices[j]];
+		K_vy=vy_map[accepted_indices[j]];
+		K_vz=vz_map[accepted_indices[j]];
+		pi_vx=vx_map[accepted_indices[k]];
+		pi_vy=vy_map[accepted_indices[k]];
+		pi_vz=vz_map[accepted_indices[k]];
+		prot_vx=0; prot_vy=0; prot_vz=0;
+		
 		tree->Fill();
               }
             }
@@ -724,6 +748,15 @@ void MakeHistograms(){
 		  blankVec(prot);
 		  prot_dt=0; K_dt=dtime_map[accepted_indices[j]];
 		  pi_dt=dtime_map[accepted_indices[k]];
+		  
+		  K_vx=vx_map[accepted_indices[j]];
+		  K_vy=vy_map[accepted_indices[j]];
+		  K_vz=vz_map[accepted_indices[j]];
+		  pi_vx=vx_map[accepted_indices[k]];
+		  pi_vy=vy_map[accepted_indices[k]];
+		  pi_vz=vz_map[accepted_indices[k]];
+		  prot_vx=0; prot_vy=0; prot_vz=0;
+
 		  topo=1;
 		  tree->Fill();
 		}
@@ -767,6 +800,17 @@ void MakeHistograms(){
 		    prot_dt=dtime_map[accepted_indices[l]];
 		    K_dt=dtime_map[accepted_indices[j]];
 		    pi_dt=dtime_map[accepted_indices[k]];
+
+		    K_vx=vx_map[accepted_indices[j]];
+		    K_vy=vy_map[accepted_indices[j]];
+		    K_vz=vz_map[accepted_indices[j]];
+		    pi_vx=vx_map[accepted_indices[k]];
+		    pi_vy=vy_map[accepted_indices[k]];
+		    pi_vz=vz_map[accepted_indices[k]];
+		    prot_vx=vx_map[accepted_indices[l]];
+                    prot_vy=vy_map[accepted_indices[l]];
+                    prot_vz=vz_map[accepted_indices[l]];
+		    
 		    topo=2;
 		    tree->Fill();
                   }
@@ -776,7 +820,7 @@ void MakeHistograms(){
           }
           
         }
-	// Lambda
+	/*// Lambda
 	for(int j = 0; j< accepted_indices.size();j++){
           auto part = parts[accepted_indices[j]];
           if (part->getPid()==2212) {
@@ -807,7 +851,7 @@ void MakeHistograms(){
 	      }
 	    }
 	  }
-	}
+	}*/
       }    
     }
   }
