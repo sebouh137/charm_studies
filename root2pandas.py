@@ -27,12 +27,12 @@ def read_root(filename,treename=None,N=None):
         df = f[treename].arrays(library="pd")
     return df
 
-input_file="/work/clas12/spaul/charm_hists/hadd.root"
-topo=0
-output_file="/work/clas12/spaul/charm_hists/D0bar_topo.pkl"
-#input_file="/work/clas12/spaul/lcp_tuples/lcp.root"
-#topo=2
-#output_file="/work/clas12/spaul/lcp_tuples/lcp_topo.pkl"
+#input_file="hadd.root"
+#topo=0
+#output_file="D0bar_topo.pkl"
+input_file="lcp.root"
+topo=2
+output_file="lcp_topo.pkl"
 
 tmp=read_root(input_file, "events")
 tmp_cut=tmp.query(f"topo=={topo}")
