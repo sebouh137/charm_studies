@@ -1,0 +1,4 @@
+# name | mother | description | pos | rotation | color | type | dimensions | material | magfield | ncopy | pMany | exist | visible | style | sensitivity | hitType | identity
+mvtx_lay1 | root | mvtx layer 1 | 0*mm 0*mm 85*mm | 0*deg 0*deg 0*deg | 66aaff | Tube | 25.23*mm 25.28*mm 135.0*mm 0*deg 360*deg | G4_Silicon | no | 1 | 1 | 1 | 1 | 1 | flux | flux | shell manual 1
+mvtx_lay2 | root | mvtx layer 2 | 0*mm 0*mm 85*mm | 0*deg 0*deg 0*deg | 66ffaa | Tube | 33.35*mm 33.40*mm 135.0*mm 0*deg 360*deg | G4_Silicon | no | 1 | 1 | 1 | 1 | 1 | flux | flux | shell manual 2
+mvtx_lay3 | root | mvtx layer 3 | 0*mm 0*mm 85*mm | 0*deg 0*deg 0*deg | ffaa66 | Tube | 41.48*mm 41.53*mm 135.0*mm 0*deg 360*deg | G4_Silicon | no | 1 | 1 | 1 | 1 | 1 | flux | flux | shell manual 3

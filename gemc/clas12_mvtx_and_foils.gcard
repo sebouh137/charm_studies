@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gcard>
+    <!-- Load the ASCII geometry database in the same directory -->
+    <detector name="./mvtx" factory="TEXT" variation="original"/>
+    <detector name="./foils" factory="TEXT" variation="original"/>
+</gcard>

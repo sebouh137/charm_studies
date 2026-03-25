@@ -1,0 +1,6 @@
+# name | mother | description | pos | rot | color | type | dimensions | material | sensitivity | hitType
+foil1 | root | carbon foil z=-50mm | 0*mm 0*mm -50*mm | 0*deg 0*deg 0*deg | 00ff00 | Box | 1*mm 13*mm 0.05*mm | G4_GRAPHITE | none | none
+foil2 | root | carbon foil z=-45mm | 0*mm 0*mm -45*mm | 0*deg 0*deg 0*deg | 00ff00 | Box | 1*mm 13*mm 0.05*mm | G4_GRAPHITE | none | none
+foil3 | root | tungsten foil z=-40mm | 0*mm 0*mm -40*mm | 0*deg 0*deg 0*deg | ff0000 | Box | 1*mm 13*mm 0.025*mm | G4_W | none | none
+foil4 | root | carbon foil z=-35mm | 0*mm 0*mm -35*mm | 0*deg 0*deg 0*deg | 00ff00 | Box | 1*mm 13*mm 0.05*mm | G4_GRAPHITE | none | none
+foil5 | root | carbon foil z=-30mm | 0*mm 0*mm -30*mm | 0*deg 0*deg 0*deg | 00ff00 | Box | 1*mm 13*mm 0.05*mm | G4_GRAPHITE | none | none
