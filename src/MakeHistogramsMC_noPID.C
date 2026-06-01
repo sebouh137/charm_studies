@@ -165,6 +165,8 @@ void MakeHistogramsMC_noPID(){
   leaf(e_vy);
   leaf(e_vz);
 
+  leaf(foil_z_mc);
+  leaf(vtx_z_mc);
   leaf(invmass);
   leaf(missmass);
   //0=K+pi-
@@ -173,6 +175,9 @@ void MakeHistogramsMC_noPID(){
   //3=K+pi-p
   leaf(topo);
 
+  //leaf(mvtx_status);
+  int mvtx_status=0;  tree->Branch("mvtx_status",&mvtx_status,"mvtx_status/I");
+  
   //count the number of each of these types of particles
   leaf(n_pim);
   leaf(n_pip);
@@ -320,7 +325,7 @@ void MakeHistogramsMC_noPID(){
 
   // leptonic variables
   TH1* h_nu = new TH1D("nu", "#nu;#nu [GeV];events", 100, 8, 11);
-  TH1* h_nu_mc = new TH1D("nu MC", "#nu (MC):#nu [GeV];evetns",100, 8, 11);
+  TH1* h_nu_mc = new TH1D("nu MC", "#nu (MC):#nu [GeV];evetns",30, 8, 11);
   TH1* h_Q2 = new TH1D("Q2", "Q^{2};Q^{2} [GeV^2];events", 100,0, 11);
   TH1* h_W = new TH1D("W", "W;W [GeV];events", 100, 0, 11);
   TH2* h_Q2_nu = new TH2D("Q2_nu", "Q^{2} vs #nu;Q^{2} [GeV^2];#nu [GeV]",100, 0, 11, 100, 0, 11);
@@ -360,7 +365,11 @@ void MakeHistogramsMC_noPID(){
   for(Int_t filenum=0;filenum<files->GetEntries();filenum++){
     //create the event reader
     clas12reader c12(files->At(filenum)->GetTitle(),{0});
-    
+
+    //index of the flux hit type
+    auto iflux = c12.addBank("MC::True");
+    auto imcpart = c12.addBank("MC::Particle"); //use MC::Particle not MC::Lund
+
     c12.connectDataBases(dbc12);
     clas12::ccdb_reader *ccdb = c12.ccdb();
     
@@ -381,13 +390,14 @@ void MakeHistogramsMC_noPID(){
     
     
     double E;
+    
     if(!isMC){
       
       
       
       if(!qadbPath.EqualTo("")){
         c12.db()->qadb_requireGolden(true);
-        c12.applyQA();
+        //c12.applyQA();
       }
       clas12::rcdb_reader *rcdb = c12.rcdb();
       
@@ -473,20 +483,68 @@ void MakeHistogramsMC_noPID(){
       
       TLorentzVector el(0,0,0,db->GetParticle(11)->Mass());
       
+      //now determine the status of the MVTX.  0b111111 indicates both particles hit all 3 layers
+      auto flux = c12.getBank(iflux);
+      mvtx_status=0;
+      if(flux){
+	int n = flux->getRows();
 
+	for(int i = 0; i < n; i++) {
+
+	  int    pid = flux->getInt("pid", i);
+	  float  x   = flux->getFloat("avgX", i);
+	  float  y   = flux->getFloat("avgY", i);
+	  float  z   = flux->getFloat("avgZ", i);
+
+	  /*float  px  = flux->getFloat("px", i);
+	  float  py  = flux->getFloat("py", i);
+	  float  pz  = flux->getFloat("pz", i);
+
+	  float  E   = flux->getFloat("energy", i);
+	  float  t   = flux->getFloat("time", i);
+
+	  int    lay = flux->getInt("layer", i); // or volume ID*/
+
+	  //get layer number from the radius
+	  float r=sqrt(x*x+y*y);
+	  int lay = -1*(r<23||r>47)+0*(r>23 && r<30)+1*(r>30 && r<37)+2*(r>37&&r<47);
+	  
+	  if(pid==-211 && lay>=0 && lay <=2)
+	    mvtx_status |= 1<<(lay);
+	  if(pid==321 && lay>=0 && lay <=2)
+            mvtx_status	|= 1<<(lay+3);
+	}
+
+      }
+
+      
       
       auto parts=c12.getDetParticles();
 
-      auto mcparts = c12.mcparts();
+
+      foil_z_mc=0;//reset
       //cout << "number of rows in mc parts" << mcparts->getRows() << endl;
-      for(short i=0; i<mcparts->getRows(); i++){
-	mcparts->setEntry(i);
-	//cout << "mc particle #"<< i << ":  pid is "<< mcparts[i].getPid() <<endl ;
-	if(mcparts->getPid()==11){
-	  h_nu_mc->Fill(E-hypot(mcparts->getP(),0.000511));
-	  break;
+      auto mcparts = c12.getBank(imcpart);
+            
+      int n = mcparts->getRows();
+      for(int i = 0; i < n; i++) {
+        int  pid = mcparts->getInt("pid", i);
+	if(pid==11){   
+	  h_nu_mc->Fill(E-sqrt(pow(mcparts->getFloat("px",i),2)+pow(mcparts->getFloat("py",i),2)+pow(mcparts->getFloat("pz",i),2)+pow(0.000511,2)));
+	    foil_z_mc=mcparts->getFloat("vz",i);
+	    break;
 	}
       }
+
+      vtx_z_mc=0;//reset
+      for(int i = 0; i < n; i++) {
+        int  pid = mcparts->getInt("pid", i);
+        if(pid==321){
+ 	   vtx_z_mc=mcparts->getFloat("vz",i);
+           break;
+        }
+      }
+      
       //cout << "end electron loop"<<endl;
       int ntracks=0;
 
@@ -692,7 +750,8 @@ void MakeHistogramsMC_noPID(){
             singleParticle_p[h_pid]->Fill(had.P());
 	  }
 	  */
-	  if (1) {
+	  /*
+	  if (0) {
 	    int bestmcindex=-1;
 	    double bestdist=0.01;
 	    for(int mcindex=0; mcindex<mcparts->getRows(); mcindex++){
@@ -714,7 +773,7 @@ void MakeHistogramsMC_noPID(){
 	      hadron_phires->Fill(1000*angle(h->getPhi()-mcparts->getPhi())*sin(mcparts->getTheta()));
 	      hadron_phires_vs_p->Fill(mcparts->getP(),1000*angle(h->getPhi()-mcparts->getPhi())*sin(mcparts->getTheta()));
 	    }
-	  }
+	    }*/
 	}
       
         double Kmass=db->GetParticle(321)->Mass();
@@ -724,12 +783,12 @@ void MakeHistogramsMC_noPID(){
 	// D0 bar
         for(int j = 0; j< accepted_indices.size();j++){
           auto part = parts[accepted_indices[j]];
-          if (part->getPid()>0)//positive charge (K+ candidate)
+          if (part->getPid()>0 && part->getStatus()>2000 && part->getStatus()<4000)//positive charge (K+ candidate)
           {
             if (debug) cout << "accepted K+" << endl;
             for(int k = 0; k< accepted_indices.size();k++){
               auto part2 = parts[accepted_indices[k]];
-              if(part2->getPid()<0){//negative charge (pi- candidate)   
+              if(part2->getPid()<0 && part2->getStatus()>2000 && part2->getStatus()<4000){//negative charge (pi- candidate)   
                 if (debug) cout << "accepted pi-" << endl;
                 TLorentzVector Kp;
                 TLorentzVector pim;
@@ -767,7 +826,7 @@ void MakeHistogramsMC_noPID(){
           }
           
         }
-
+	/*
 	// Lambda c
         for(int j = 0; j< accepted_indices.size();j++){
           auto part = parts[accepted_indices[j]];
@@ -820,8 +879,8 @@ void MakeHistogramsMC_noPID(){
               }
             }
           }
-          
-        }
+	
+        }*/
       }    
     }
   }
