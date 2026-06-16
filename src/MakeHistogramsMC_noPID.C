@@ -140,7 +140,21 @@ bool acceptHadron(clas12::region_particle * h, clas12::region_particle * electro
   //  return false;
 }*/
 
+void getFTOF(clas12::region_part_ptr p, double& chFTOF1A, double& chFTOF1B, double& chFTOF2){
+  //if(p->sci(FTOF1B)->getDetector() == FTOF1B) {
+        // 3. Retrieve the paddle / channel number
+        chFTOF1B = p->sci(FTOF1B)->getComponent();
+	//}
+	//else chFTOF1B=-1;
 
+	//if(p->sci(FTOF1A)->getDetector() == FTOF1A) {
+        // 3. Retrieve the paddle / channel number                              
+        chFTOF1A = p->sci(FTOF1A)->getComponent();
+
+	chFTOF2 = p->sci(FTOF2)->getComponent();
+	//}
+	//else chFTOF1A=-1;
+}
 
 void MakeHistogramsMC_noPID(){
   // Record start time
@@ -169,6 +183,16 @@ void MakeHistogramsMC_noPID(){
   leaf(vtx_z_mc);
   leaf(invmass);
   leaf(missmass);
+
+  // if it's a D0 bar star, include also the photons
+  leaf(invmass_star);
+  leaf(n_ph);
+  leaf(ph_px);
+  leaf(ph_py);
+  leaf(ph_pz);
+  leaf(ph_E);
+  leaf(ph_m); //mass of the photonic system (zero if a single photon, non-zero for multiphoton state such as pi0)
+  
   //0=K+pi-
   //1=K-pi+
   //2=K-pi+p
@@ -185,6 +209,12 @@ void MakeHistogramsMC_noPID(){
   leaf(n_Kp);
   leaf(n_Km);
 
+  leaf(K_FTOF1A);
+  leaf(K_FTOF1B);
+  leaf(K_FTOF2);
+  leaf(pi_FTOF1A);
+  leaf(pi_FTOF1B);
+  leaf(pi_FTOF2);
 //macro to create one column for each particle.  
 #define leaf3(name) leaf(K_##name); leaf(pi_##name); leaf(prot_##name);
 
@@ -779,6 +809,25 @@ void MakeHistogramsMC_noPID(){
         double Kmass=db->GetParticle(321)->Mass();
         double pimass=db->GetParticle(211)->Mass();
         double pmass=db->GetParticle(2212)->Mass();
+
+	//photons
+	ph_px=0;ph_py=0;ph_pz=0;ph_E=0;n_ph=0;
+	for(int j=0; j<parts.size(); j++){
+	  auto part = parts[j];
+	  if (part->getPid()!=22 || part->getStatus()<2000 || part->getStatus()>4000)
+	    continue;
+	  double Eph=sqrt(pow(part->par()->getPx(),2)+pow(part->par()->getPy(),2)+pow(part->par()->getPz(),2));
+	  if(Eph<0.1)
+	    continue;
+	  ph_px+= part->par()->getPx();
+	  ph_py+= part->par()->getPy();
+	  ph_pz+= part->par()->getPz();
+	  ph_E+= Eph;
+	  n_ph+=1;
+	  
+	}
+	TLorentzVector ph={ph_px,ph_py,ph_pz, ph_E};
+
 	
 	// D0 bar
         for(int j = 0; j< accepted_indices.size();j++){
@@ -795,6 +844,13 @@ void MakeHistogramsMC_noPID(){
                 SetLorentzVector(Kp,part, Kmass);
                 SetLorentzVector(pim,part2,pimass);
                 invmass = (Kp+pim).M();
+		invmass_star = (Kp+pim+ph).M();
+		ph_m=ph.M();
+
+		getFTOF(part, K_FTOF1A, K_FTOF1B, K_FTOF2);
+		getFTOF(part2, pi_FTOF1A, pi_FTOF1B, pi_FTOF2);
+		
+		
                 if(debug) cout << "pair mass "  << invmass <<  endl;
                 invmass_Kp_pim->Fill(invmass);
 		invmass_Kp_pim_zoom->Fill(invmass);
